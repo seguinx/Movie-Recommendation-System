@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Recommandation de films</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f6f8;
+      margin: 0;
+      padding: 40px;
+    }
+    .container {
+      max-width: 800px;
+      margin: auto;
+      background: white;
+      padding: 24px;
+      border-radius: 12px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+    }
+    h1 {
+      margin-top: 0;
+    }
+    input {
+      padding: 10px;
+      width: 220px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+    }
+    button {
+      padding: 10px 16px;
+      border: none;
+      background: #2563eb;
+      color: white;
+      border-radius: 8px;
+      cursor: pointer;
+      margin-left: 8px;
+    }
+    button:hover {
+      background: #1d4ed8;
+    }
+    .movie {
+      padding: 12px;
+      border-bottom: 1px solid #eee;
+    }
+    .movie:last-child {
+      border-bottom: none;
+    }
+    .title {
+      font-weight: bold;
+    }
+    .score {
+      color: #555;
+      font-size: 14px;
+    }
+    #results {
+      margin-top: 24px;
+    }
+    .error {
+      color: #b91c1c;
+      font-weight: bold;
+      margin-top: 16px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Recommandation de films</h1>
+    <p>Entre un userId pour obtenir 10 films non vus recommandés.</p>
+
+    <input type="number" id="userId" placeholder="Ex: 1">
+    <button onclick="getRecommendations()">Recommander</button>
+
+    <div id="message"></div>
+    <div id="results"></div>
+  </div>
+
+  <script>
+    async function getRecommendations() {
+      const userId = document.getElementById("userId").value;
+      const message = document.getElementById("message");
+      const results = document.getElementById("results");
+
+      message.innerHTML = "";
+      results.innerHTML = "";
+
+      try {
+        const response = await fetch("/recommend", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ userId: userId })
+        });
+
+        const data = await response.json();
+
+        if (data.error) {
+          message.innerHTML = `<div class="error">${data.error}</div>`;
+          return;
+        }
+
+        if (!data.recommendations || data.recommendations.length === 0) {
+          message.innerHTML = `<div class="error">Aucune recommandation trouvée.</div>`;
+          return;
+        }
+
+        message.innerHTML = `<p><strong>Top 10 recommandations pour userId ${data.userId}</strong></p>`;
+
+        data.recommendations.forEach(movie => {
+          results.innerHTML += `
+            <div class="movie">
+              <div class="title">${movie.title}</div>
+              <div class="score">
+                Probabilité d'aimer: ${Number(movie.like_proba).toFixed(3)} |
+                Note moyenne: ${Number(movie.movie_mean_rating).toFixed(2)} |
+                Nombre de notes: ${movie.movie_rating_count}
+              </div>
+            </div>
+          `;
+        });
+
+      } catch (error) {
+        message.innerHTML = `<div class="error">Erreur de connexion au serveur.</div>`;
+      }
+    }
+  </script>
+</body>
+</html>
