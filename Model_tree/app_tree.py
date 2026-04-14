@@ -1,8 +1,38 @@
-from flask import Flask, request, jsonify, render_template
-import pickle
+from flask import Flask, jsonify, render_template
 import pandas as pd
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.preprocessing import MultiLabelBinarizer
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.model_selection import train_test_split
+import numpy as np
+
+app = Flask(__name__)
+
+ratings = pd.read_csv("ratings.csv")
+movies_df = pd.read_csv("movies.csv")
+
+df = ratings.merge(movies_df, on="movieId", how="left")
+
+df["genres_list"] = df["genres"].str.split("|")
+df["like"] = (df["rating"] >= 3).astype(int)
+
+user_stats = df.groupby("userId")["rating"].mean().rename("user_mean_rating").reset_index()
+df = df.merge(user_stats, on="userId", how="left")
+
+movie_stats = df.groupby("movieId")["rating"].agg(
+    movie_mean_rating="mean",
+    movie_rating_count="count"
+).reset_index()
+df = df.merge(movie_stats, on="movieId", how="left")
+
+movies = df.groupby("movieId", as_index=False).agg(
+    title=("title", "first"),
+    genres_list=("genres_list", "first"),
+    movie_mean_rating=("movie_mean_rating", "first"),
+    movie_rating_count=("movie_rating_count", "first")
+)
 
 class GenresBinarizer(BaseEstimator, TransformerMixin):
     def __init__(self):
@@ -15,38 +45,46 @@ class GenresBinarizer(BaseEstimator, TransformerMixin):
     def transform(self, X):
         return self.mlb.transform(X.iloc[:, 0])
 
-app = Flask(__name__)
+feature_cols = ["genres_list", "user_mean_rating", "movie_mean_rating", "movie_rating_count"]
+X = df[feature_cols]
+y = df["like"]
 
-with open("reco_model.pkl", "rb") as f:
-    pipe = pickle.load(f)
-
-ratings = pd.read_csv("ratings.csv")
-movies_raw = pd.read_csv("movies.csv")
-
-df = ratings.merge(movies_raw, on="movieId")
-
-df["genres_list"] = df["genres"].apply(lambda x: x.split("|") if isinstance(x, str) else [])
-df["like"] = (df["rating"] >= 4).astype(int)
-
-user_mean = df.groupby("userId")["rating"].mean().rename("user_mean_rating")
-df = df.merge(user_mean, on="userId")
-
-movies = df.groupby("movieId", as_index=False).agg(
-    title=("title", "first"),
-    genres_list=("genres_list", "first"),
-    movie_mean_rating=("rating", "mean"),
-    movie_rating_count=("rating", "count")
+preprocess = ColumnTransformer(
+    transformers=[
+        ("genres", GenresBinarizer(), ["genres_list"]),
+        ("num", "passthrough", ["user_mean_rating", "movie_mean_rating", "movie_rating_count"])
+    ]
 )
 
-def recommend_for_user(user_id, df_ratings, movies, pipe, top_n=10):
+clf = DecisionTreeClassifier(
+    max_depth=10,
+    min_samples_leaf=5,
+    random_state=42
+)
+
+pipe = Pipeline([
+    ("preprocess", preprocess),
+    ("model", clf)
+])
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42
+)
+
+pipe.fit(X_train, y_train)
+print("Accuracy:", pipe.score(X_test, y_test))
+
+
+def recommend_for_user(user_id, df_ratings, movies, pipe, top_n=10, min_votes=20):
     user_ratings = df_ratings[df_ratings["userId"] == user_id]
-
-    if user_ratings.empty:
-        return None
-
     seen = set(user_ratings["movieId"])
 
-    candidates = movies[~movies["movieId"].isin(seen)].copy()
+    min_votes = 3
+    candidates = movies[
+        (~movies["movieId"].isin(seen)) &
+        (movies["movie_rating_count"] >= min_votes)
+    ].copy()
+
     if candidates.empty:
         return candidates
 
@@ -68,39 +106,30 @@ def recommend_for_user(user_id, df_ratings, movies, pipe, top_n=10):
 
     return recs[["movieId", "title", "like_proba", "movie_mean_rating", "movie_rating_count"]]
 
-@app.route("/", methods=["GET"])
+
+@app.route("/")
 def home():
     return render_template("index.html")
 
-@app.route("/health", methods=["GET"])
-def health():
-    return jsonify({"status": "ok"})
 
-@app.route("/recommend", methods=["POST"])
-def recommend():
-    data = request.get_json()
-    user_id = data.get("userId")
-
-    if user_id is None:
-        return jsonify({"error": "userId est requis"}), 400
-
-    try:
-        user_id = int(user_id)
-    except:
-        return jsonify({"error": "userId doit être un entier"}), 400
+@app.route("/recommend/<int:user_id>")
+def recommend(user_id):
+    if user_id not in df["userId"].values:
+        return jsonify({"error": "userId introuvable"}), 404
 
     recs = recommend_for_user(user_id, df, movies, pipe, top_n=10)
 
-    if recs is None:
-        return jsonify({"error": "Utilisateur introuvable"}), 404
-
-    if recs.empty:
-        return jsonify({"userId": user_id, "recommendations": []})
+    if recs is None or recs.empty:
+        return jsonify({
+            "userId": user_id,
+            "recommendations": []
+        })
 
     return jsonify({
         "userId": user_id,
         "recommendations": recs.to_dict(orient="records")
     })
+
 
 if __name__ == "__main__":
     app.run(debug=True)
