@@ -4,10 +4,10 @@ import numpy as np
 
 app = Flask(__name__)
 
-with open('svm_model.pkl', 'rb') as f:
+with open('SVM/svm_model.pkl', 'rb') as f:
     model = pickle.load(f)
 
-with open('svm_scaler.pkl', 'rb') as f:
+with open('SVM/svm_scaler.pkl', 'rb') as f:
     scaler = pickle.load(f)
 
 @app.route('/')
