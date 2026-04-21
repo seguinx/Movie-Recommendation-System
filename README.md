@@ -1,36 +1,44 @@
 🎬 Movie Recommendation System
-A collaborative project built by a team of 3, exploring different machine learning approaches for movie recommendation.
+A team project built by 3 members to explore movie recommendation using machine learning, API development, and cloud deployment.
 
-🚀 Overview
-We developed three distinct recommendation models:
+🚀 What we built
+We each developed a recommendation model using a different algorithm:
 
-🔹 Support Vector Machine (SVM)
+🔹 SVM
 
 🌳 Decision Tree
 
-📊 K-Nearest Neighbors (KNN)
+📊 KNN
 
-Each member designed, trained, and evaluated their own model.
+The main goal of the project was to demonstrate our ability to:
+
+build a machine learning workflow.
+
+create and test an API.
+
+deploy a service on the cloud using Render ☁️
+
+🌐 API Deployment
+Each model was wrapped into an API.
+
+APIs were deployed and tested on Render.
+
+This project highlights end-to-end implementation, from model to live service.
 
 📂 Dataset
 We used a movie ratings dataset containing movie IDs, titles, genres, user IDs, ratings, and timestamps.
 
-🌐 API & Deployment
-Each model is deployed as an API
+📝 Note
+This project is mainly a technical demo to showcase our skills in:
 
-Hosted on Render ☁️
+machine learning implementation
 
-Tested to simulate real-world usage
+API creation
 
-Example API Call
-Enter a userId in the web interface to generate movie recommendations.
+Links:
 
-Example: userId = 1 → the API returns the top 10 recommended movies.
+Tree_Model: https://projet-outil-infonuagique-ua3-5.onrender.com/    
+KNN: https://projet-outil-infonuagique-ua3.onrender.com
 
-🧪 Evaluation
-Individual model evaluation
+cloud deployment
 
-Comparison of strengths and performance
-
-📁 Notes
-Other files are related to presentation and are not part of the core project
